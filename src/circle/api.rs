@@ -16,12 +16,12 @@ pub struct MessageItem {
     pub status: String,
 }
 
-pub async fn message(transaction_hash: String) -> Message {
+pub async fn message(source_chain_id:u32,burn_transaction_hash: String) -> Message {
     println!(
-        "https://iris-api-sandbox.circle.com/v2/messages/0?transactionHash={transaction_hash}"
+        "https://iris-api-sandbox.circle.com/v2/messages/{source_chain_id}?transactionHash={burn_transaction_hash}"
     );
     reqwest::get(format!(
-        "https://iris-api-sandbox.circle.com/v2/messages/0?transactionHash={transaction_hash}"
+        "https://iris-api-sandbox.circle.com/v2/messages/{source_chain_id}?transactionHash={burn_transaction_hash}"
     ))
     .await
     .unwrap()

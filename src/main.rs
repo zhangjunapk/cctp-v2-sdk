@@ -5,7 +5,7 @@ use cctp_v2_sdk::config::{Chain, Env};
 async fn main() {
     let destation_address = "0x34435151EaD1Eae702d26EE1274E02DC69E9C641";
     let cctpv2 = Cctpv2::new(Env::Dev);
-  /*  cctpv2
+    /*cctpv2
         .start_burn(
             Chain::Evm,
             Chain::Avalanche,
@@ -18,8 +18,9 @@ async fn main() {
         .await;*/
     cctpv2
     .receive(
+        Chain::Evm,
         Chain::Avalanche,
-        "0xdd90fe9afc4e5997911e5df893aa887e232560362383f5f291fba3738d4faecf".to_string(),
+        "0x0ff7dd975bbf552bebc01924db6d84c05f6bc76deaf6d0232d7c415f47d4f1ac".to_string(),
     )
     .await;
 }

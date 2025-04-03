@@ -77,34 +77,47 @@ impl Cctpv2 {
         }
     }
 
-    pub async fn receive(&self, desc_chain: Chain, burn_transaction_hash: String) {
-        let message_response = message(burn_transaction_hash).await;
+    pub async fn receive(
+        &self,
+        source_chain: Chain,
+        desc_chain: Chain,
+        burn_transaction_hash: String,
+    ) {
+        let source_chain_config = self.config.chain_config.get(&source_chain);
 
-        let message_item = message_response.messages.get(0).unwrap();
-
-        if message_item.status != "complete" {
-            info!("Message status is not complete, skipping.");
-            return;
-        }
-
-        let chain_config = self.config.chain_config.get(&desc_chain);
+        let desc_chain_config = self.config.chain_config.get(&desc_chain);
 
         let provider = self.provider_provider.provider(&desc_chain);
 
         if let Some(provider) = provider {
-            if let Some(chain_config) = chain_config {
-                let message_transmitter =
-                    MessageTransmitter::new(&chain_config.contract.message_transmitter, provider);
-                println!("message:{}", message_item.message);
-                println!("attestation:{}", message_item.attestation);
+            if let Some(dest_chain_config) = desc_chain_config {
+                if let Some(source_chain_config) = source_chain_config {
+                    let message_response =
+                        message(source_chain_config.id, burn_transaction_hash).await;
 
-                let message_bytes = Bytes::from_str(message_item.message.clone().as_str()).unwrap();
-                let attestation_bytes =
-                    Bytes::from_str(message_item.attestation.clone().as_str()).unwrap();
+                    let message_item = message_response.messages.get(0).unwrap();
 
-                message_transmitter
-                    .receive_message(message_bytes, attestation_bytes)
-                    .await;
+                    if message_item.status != "complete" {
+                        info!("Message status is not complete, skipping.");
+                        return;
+                    }
+
+                    let message_transmitter = MessageTransmitter::new(
+                        &dest_chain_config.contract.message_transmitter,
+                        provider,
+                    );
+                    println!("message:{}", message_item.message);
+                    println!("attestation:{}", message_item.attestation);
+
+                    let message_bytes =
+                        Bytes::from_str(message_item.message.clone().as_str()).unwrap();
+                    let attestation_bytes =
+                        Bytes::from_str(message_item.attestation.clone().as_str()).unwrap();
+
+                    message_transmitter
+                        .receive_message(message_bytes, attestation_bytes)
+                        .await;
+                }
             }
         }
     }
