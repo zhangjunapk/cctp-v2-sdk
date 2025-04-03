@@ -1,4 +1,3 @@
-use crate::config::Config;
 use alloy::network::{AnyNetwork, EthereumWallet};
 use alloy::primitives::U256;
 use alloy::providers::fillers::{
@@ -65,14 +64,14 @@ impl Usdc {
         }
     }
 
-    pub async fn approve(&self, config: &Config) {
+    pub async fn approve(&self,token_message_contract_address:&str,amount:u128) {
         let approve_result = self
             .instance
             .approve(
-                (&config.contract.dev.token_message.evm.as_str())
+                token_message_contract_address
                     .parse()
                     .unwrap(),
-                U256::try_from(1000000u128).unwrap(),
+                U256::try_from(amount).unwrap(),
             )
             .send()
             .await;

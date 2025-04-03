@@ -1,12 +1,12 @@
-use crate::config::Config;
 use crate::contract::token_message::TOKEN_MESSAGE::TOKEN_MESSAGEInstance;
 use alloy::network::{AnyNetwork, EthereumWallet};
-use alloy::primitives::{FixedBytes, U256, address};
+use alloy::primitives::{Address, FixedBytes, U256};
 use alloy::providers::fillers::{
     BlobGasFiller, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, WalletFiller,
 };
 use alloy::providers::{Identity, RootProvider};
 use alloy::sol;
+use std::str::FromStr;
 
 sol!(
     #[allow(missing_docs)]
@@ -59,21 +59,27 @@ impl TokenMessage {
         }
     }
 
-    pub async fn burn(&self, config: &Config) -> Result<String, ()> {
+    pub async fn burn(
+        &self,
+        burn_amount: u128,
+        destination_domain: u32,
+        destination_address: &str,
+        usdc_contract_address: String,
+        max_fee: u128,
+        finality_threshold: u32,
+    ) -> Result<String, ()> {
         //alloy_primitives::bits::fixed::FixedBytes<32>,
 
         let burn = self
             .token_messageinstance
             .depositForBurn(
-                U256::from(1000000u128),
-                6, //目标链的id
-                FixedBytes::from(
-                    address!("0x69d7b3de716ea095f15821d77ee9260e2d988d3b").into_word(),
-                ),
-                (&config.contract.dev.usdc.evm.as_str()).parse().unwrap(),
+                U256::from(burn_amount),
+                destination_domain, //目标链的id
+                FixedBytes::from(Address::from_str(destination_address).unwrap().into_word()),
+                usdc_contract_address.parse().unwrap(),
                 FixedBytes::default(),
-                U256::try_from(100000u128).unwrap(),
-                2000,
+                U256::try_from(max_fee).unwrap(),
+                finality_threshold,
             )
             .send()
             .await;

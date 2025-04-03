@@ -1,0 +1,26 @@
+#metamask
+wallet_private_key:
+chain_config:
+  Evm:
+    id: 0
+    #sepolia
+    endpoint:
+    contract:
+      usdc: 0x1c7d4b196cb0c7b01d743fbc6116a902379c7238
+      token_message: 0x8fe6b999dc680ccfdd5bf7eb0974218be2542daa
+      message_transmitter: 0xe737e5cebeeba77efe34d4aa090756590b1ce275
+  Avalanche:
+    id: 1
+    #fuji
+    endpoint:
+    contract:
+      usdc: 0x5425890298aed601595a70AB815c96711a31Bc65
+      token_message: 0x8fe6b999dc680ccfdd5bf7eb0974218be2542daa
+      message_transmitter: 0xe737e5cebeeba77efe34d4aa090756590b1ce275
+  Base:
+    id: 6
+    endpoint:
+    contract:
+      usdc: 0x036CbD53842c5426634e7929541eC2318f3dCF7e
+      token_message: 0x8fe6b999dc680ccfdd5bf7eb0974218be2542daa
+      message_transmitter: 0xe737e5cebeeba77efe34d4aa090756590b1ce275

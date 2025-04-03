@@ -1,8 +1,10 @@
 use crate::circle::api::message;
-use crate::config::Config;
+use crate::config::{Chain, ChainConfig, Config, Env};
 use crate::contract::message_transmitter::MessageTransmitter;
 use crate::contract::token_message::TokenMessage;
 use crate::contract::usdc::Usdc;
+use crate::provider_provider;
+use crate::provider_provider::ProviderProvider;
 use alloy::network::{AnyNetwork, EthereumWallet};
 use alloy::primitives::Bytes;
 use alloy::providers::fillers::{
@@ -13,58 +15,69 @@ use alloy::signers::local::PrivateKeySigner;
 use anyhow::anyhow;
 use log::info;
 use reqwest::Url;
+use std::str::FromStr;
+use std::sync::Arc;
 
 pub struct Cctpv2 {
     config: Config,
-    provider: FillProvider<
-        JoinFill<
-            JoinFill<
-                Identity,
-                JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>,
-            >,
-            WalletFiller<EthereumWallet>,
-        >,
-        RootProvider<AnyNetwork>,
-        AnyNetwork,
-    >,
+    provider_provider: ProviderProvider,
 }
 
 impl Cctpv2 {
-    pub fn new() -> Self {
-        let config = Config::load_config();
+    pub fn new(env: Env) -> Self {
+        let config = Config::load_config(env);
         match config {
-            Ok(config) => {
-                let signer: PrivateKeySigner = config.wallet_private_key.parse().unwrap();
-                let wallet = EthereumWallet::from(signer);
-                let provider = ProviderBuilder::new()
-                    .wallet(wallet)
-                    .network::<AnyNetwork>()
-                    .on_http(Url::parse(config.evm_endpoint.as_str()).unwrap());
-                Cctpv2 { config, provider }
-            }
+            Ok(config) => Cctpv2 {
+                config: config.clone(),
+                provider_provider: ProviderProvider {
+                    config: config.clone(),
+                },
+            },
             Err(err) => {
                 panic!("加载配置错误:{}", err);
             }
         }
     }
 
-    pub async fn start_burn(&self) {
-        println!("new instance:{:?}", &self.config.contract.dev.usdc.evm);
-        println!(
-            "token message:{:?}",
-            &self.config.contract.dev.token_message.evm
-        );
+    pub async fn start_burn(
+        &self,
+        source_chain: Chain,
+        destination_chain: Chain,
+        approve_amount: u128,
+        burn_amount: u128,
+        destination_address: &str,
+        max_fee: u128,
+        finality_threshold: u32,
+    ) {
+        let desc_chain_config = self.config.chain_config.get(&destination_chain).unwrap();
 
-        let usdc = Usdc::new(&self.config.contract.dev.usdc.evm, self.provider.clone());
-        let token_message = TokenMessage::new(
-            &self.config.contract.dev.token_message.evm,
-            self.provider.clone(),
-        );
-        usdc.approve(&self.config).await;
-        token_message.burn(&self.config).await.unwrap();
+        let chain_config = self.config.chain_config.get(&source_chain);
+
+        let provider = self.provider_provider.provider(&source_chain);
+
+        if let Some(chain_config) = chain_config {
+            if let Some(provider) = provider {
+                let usdc = Usdc::new(&*chain_config.contract.usdc, provider.clone());
+                let token_message =
+                    TokenMessage::new(&*chain_config.contract.token_message, provider.clone());
+                usdc.approve(&*chain_config.contract.token_message, approve_amount)
+                    .await;
+                token_message
+                    .burn(
+                        burn_amount,
+                        desc_chain_config.id,
+                        destination_address,
+                        chain_config.contract.usdc.clone().to_string(),
+                        max_fee,
+                        finality_threshold,
+                    )
+                    .await
+                    .unwrap();
+            }
+        }
     }
 
-    pub async fn receive(&self, burn_transaction_hash: String) {
+    pub async fn receive(&self, desc_chain: Chain, burn_transaction_hash: String) {
         let message_response = message(burn_transaction_hash).await;
 
         let message_item = message_response.messages.get(0).unwrap();
@@ -74,19 +87,25 @@ impl Cctpv2 {
             return;
         }
 
-        let message_transmitter = MessageTransmitter::new(
-            &self.config.contract.dev.message_transmitter.evm,
-            self.provider.clone(),
-        );
+        let chain_config = self.config.chain_config.get(&desc_chain);
 
-        println!("message:{}", message_item.message);
-        println!("attestation:{}", message_item.attestation);
+        let provider = self.provider_provider.provider(&desc_chain);
 
-        let message_bytes = Bytes::from(message_item.message.clone());
-        let attestation_bytes = Bytes::from(message_item.attestation.clone());
+        if let Some(provider) = provider {
+            if let Some(chain_config) = chain_config {
+                let message_transmitter =
+                    MessageTransmitter::new(&chain_config.contract.message_transmitter, provider);
+                println!("message:{}", message_item.message);
+                println!("attestation:{}", message_item.attestation);
 
-        message_transmitter
-            .receive_message(message_bytes, attestation_bytes)
-            .await;
+                let message_bytes = Bytes::from_str(message_item.message.clone().as_str()).unwrap();
+                let attestation_bytes =
+                    Bytes::from_str(message_item.attestation.clone().as_str()).unwrap();
+
+                message_transmitter
+                    .receive_message(message_bytes, attestation_bytes)
+                    .await;
+            }
+        }
     }
 }
